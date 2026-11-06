@@ -1,54 +1,89 @@
 
-/* UASerials for Lampa — integration test v0.1
- * This plugin does NOT extract or play videos from uaserials.my.
- * It adds a button to film/series details and displays the selected title.
- */
 (function () {
   'use strict';
-  if (window.__uaserials_lampa_test_loaded) return;
-  window.__uaserials_lampa_test_loaded = true;
 
-  function notify(message) {
-    if (window.Lampa && Lampa.Noty && typeof Lampa.Noty.show === 'function') {
-      Lampa.Noty.show(message);
-    } else {
-      console.log('[UASerials]', message);
+  if (window.__uaserials_v02_loaded) return;
+  window.__uaserials_v02_loaded = true;
+
+  var started = false;
+
+  function notice(msg) {
+    try {
+      if (window.Lampa && Lampa.Noty && Lampa.Noty.show) {
+        Lampa.Noty.show(msg);
+      }
+    } catch (err) {
+      console.log('[UASerials]', err);
+    }
+    console.log('[UASerials]', msg);
+  }
+
+  function addButton(e) {
+    if (!e || e.type !== 'complite' ||
+        !e.object || !e.object.activity ||
+        !e.object.activity.render) return;
+
+    try {
+      var root = e.object.activity.render();
+      if (!root || !root.find || !window.$) return;
+      if (root.find('.uaserials-test-button').length) return;
+
+      var buttons = root.find(
+        '.full-start-new__buttons, .full-start__buttons'
+      ).first();
+
+      if (!buttons.length) {
+        buttons = root.find('.view--torrent').parent();
+      }
+      if (!buttons.length) return;
+
+      var movie = (e.data && (e.data.movie || e.data)) || {};
+      var title = movie.title || movie.name ||
+        movie.original_title || movie.original_name || 'Фільм';
+
+      var button = $(
+        '<div class="full-start__button selector uaserials-test-button" ' +
+        'data-subtitle="UASerials Test">' +
+        '<svg viewBox="0 0 24 24" width="24" height="24">' +
+        '<path fill="currentColor" d="M8 5v14l11-7z"/>' +
+        '</svg><span>UASerials</span></div>'
+      );
+
+      button.on('hover:enter click', function () {
+        notice('UASerials v0.2: ' + title + ' — кнопка працює');
+      });
+
+      buttons.append(button);
+    } catch (err) {
+      console.log('[UASerials] Button error:', err);
     }
   }
 
-  function getTitle(data) {
-    var item = (data && (data.movie || data.data || data.object)) || {};
-    return item.title || item.name || item.original_title || item.original_name || 'Невідома назва';
-  }
-
-  function addButton(event) {
-    if (!event || event.type !== 'complite') return;
-    var activity = event.object;
-    if (!activity || !activity.activity || !activity.activity.render) return;
-    var root = activity.activity.render();
-    if (!root || !window.$) return;
-    var buttons = root.find('.full-start__buttons');
-    if (!buttons.length || buttons.find('.uaserials-online-test').length) return;
-
-    var button = $('<div class="full-start__button selector uaserials-online-test" data-subtitle="UASerials"><span>UASerials</span></div>');
-    button.on('hover:enter click', function () {
-      notify('UASerials: ' + getTitle(event.data || activity) + '. Тест інтеграції успішний. Відеоджерело ще не підключене.');
-    });
-    buttons.append(button);
-  }
-
   function start() {
-    if (!window.Lampa || !Lampa.Listener || !Lampa.Listener.follow) return;
+    if (started || !window.Lampa ||
+        !Lampa.Listener || !Lampa.Listener.follow) return;
+
+    started = true;
     Lampa.Listener.follow('full', addButton);
-    notify('UASerials Test v0.1 завантажено');
+    notice('UASerials Test v0.2 завантажено');
   }
 
-  if (window.appready) start();
-  else if (window.Lampa && Lampa.Listener) {
-    Lampa.Listener.follow('app', function (event) {
-      if (event.type === 'ready') start();
+  function bootstrap() {
+    if (!window.Lampa || !Lampa.Listener ||
+        !Lampa.Listener.follow) {
+      return setTimeout(bootstrap, 300);
+    }
+
+    if (window.appready) return start();
+
+    Lampa.Listener.follow('app', function (e) {
+      if (e && e.type === 'ready') start();
     });
-  } else {
-    console.warn('[UASerials] Lampa API is not available');
+
+    setTimeout(function () {
+      if (!started) start();
+    }, 1500);
   }
+
+  bootstrap();
 })();
